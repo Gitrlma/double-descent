@@ -70,6 +70,7 @@ class PreActResNet(nn.Module):
 def train_model(model_name, dimensions, classes, layer_width, epochs, size):
     colour = 'coloured' if dimensions == 3 else 'grayscale'
     writer = SummaryWriter(log_dir=f'celebA/resnet/epoch_wise/width_{layer_width}/{model_name}_{colour}')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     torch.manual_seed(1234)
 
@@ -97,6 +98,7 @@ def train_model(model_name, dimensions, classes, layer_width, epochs, size):
     validation_loader = torch.utils.data.DataLoader(validation_set, batch_size=batch_size, shuffle=False, num_workers = 8)
 
     model = PreActResNet(PreActBlock, [2, 2, 2, 2], num_classes = classes, init_channels = layer_width, in_dim = dimensions) #Adoperate paper resnet
+    model.to(device)
     criterion = nn.BCEWithLogitsLoss() #nn.CrossEntropyLoss()
     learning_rate = 1e-3
     optimizer = optim.AdamW(model.parameters(),
@@ -110,6 +112,8 @@ def train_model(model_name, dimensions, classes, layer_width, epochs, size):
         train_epoch_steps = 0
         for images, labels in training_loader:
             optimizer.zero_grad()
+            images = images.to(device)
+            labels = labels.to(device)
             pred = model(images)
             loss = criterion(pred.squeeze(), labels[:, 2].float())
             loss.backward()
@@ -128,6 +132,8 @@ def train_model(model_name, dimensions, classes, layer_width, epochs, size):
         validation_epoch_steps = 0
         model.eval()
         for images, labels in validation_loader:
+            images = images.to(device)
+            labels = labels.to(device)
             with torch.no_grad():
                 pred = model(images)
                 loss = criterion(pred.squeeze(), labels[:, 2].float())
@@ -143,14 +149,12 @@ if __name__ == "__main__":
     torch.manual_seed(1234)
     model_names = ['160k', '100k']
     dimensions = [1, 3]
-    classes = 1
+    classes = 1 # CelebA classes to predict
     layer_width = 8
     epochs = 10
     size = 32
-    train_model(model_names[1], dimensions[0], classes, layer_width, epochs, size)
-
-'''
+    #train_model(model_names[1], dimensions[0], classes, layer_width, epochs, size)
     for i in range(len(model_names)):
         for j in range(len(dimensions)):
             train_model(model_names[i], dimensions[j], classes, layer_width, epochs)
-            print(f'Model: {model_names[i]} with {dimensions[j]} dimensions is completed')'''
+            print(f'Model: {model_names[i]} with {dimensions[j]} dimensions is completed')

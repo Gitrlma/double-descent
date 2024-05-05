@@ -53,6 +53,7 @@ def make_cnn(c=64, num_classes=10, in_dim = 3):
 def train_model(model_name, dimensions, classes, layer_width, epochs, size):
     colour = 'coloured' if dimensions == 3 else 'grayscale'
     writer = SummaryWriter(log_dir=f'celebA/mcnn/epoch_wise/width_{layer_width}/{model_name}_{colour}')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     torch.manual_seed(1234)
 
@@ -82,6 +83,7 @@ def train_model(model_name, dimensions, classes, layer_width, epochs, size):
                                              shuffle=False)
 
     model = make_cnn(c = layer_width, num_classes = classes, in_dim = dimensions)  # adoperate paper CNN
+    model.to(device)
     criterion = nn.BCEWithLogitsLoss() #nn.CrossEntropyLoss()
     learning_rate = 1e-3
     optimizer = optim.AdamW(model.parameters(),
@@ -93,8 +95,9 @@ def train_model(model_name, dimensions, classes, layer_width, epochs, size):
         model.train()
         train_loss = 0
         train_epoch_steps = 0
-        #for batch_idx, (images, labels) in enumerate(tqdm(training_loader)):
         for images, labels in training_loader:
+            images = images.to(device)
+            labels = labels.to(device)
             optimizer.zero_grad()
             pred = model(images)
             loss = criterion(pred.squeeze(), labels[:, 2].float())
@@ -114,8 +117,9 @@ def train_model(model_name, dimensions, classes, layer_width, epochs, size):
         total_loss = 0.0
         validation_epoch_steps = 0
         model.eval()
-        #for batch_idx, (images, labels) in enumerate(tqdm(validation_loader)):
         for images, labels in validation_loader:
+            images = images.to(device)
+            labels = labels.to(device)
             with torch.no_grad():
                 pred = model(images)
                 loss = criterion(pred.squeeze(), labels[:, 2].float())
@@ -131,14 +135,12 @@ if __name__ == "__main__":
     torch.manual_seed(1234)
     model_names = ['160k', '100k']
     dimensions = [1, 3]
-    classes = 1
+    classes = 1  # CelebA classes to predict
     layer_width = 8
     epochs = 10
     size = 32
-    train_model(model_names[1], dimensions[0], classes, layer_width, epochs, size)
-
-'''
+    # train_model(model_names[1], dimensions[0], classes, layer_width, epochs, size)
     for i in range(len(model_names)):
         for j in range(len(dimensions)):
             train_model(model_names[i], dimensions[j], classes, layer_width, epochs)
-            print(f'Model: {model_names[i]} with {dimensions[j]} dimensions is completed')'''
+            print(f'Model: {model_names[i]} with {dimensions[j]} dimensions is completed')
