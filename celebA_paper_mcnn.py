@@ -50,7 +50,7 @@ def make_cnn(c=64, num_classes=10, in_dim = 3):
     )
 
 
-def train_model(model_name, dimensions, classes, layer_width, epochs, size):
+def train_model(model_name, dimensions, classes, layer_width, epochs, size = 128):
     colour = 'coloured' if dimensions == 3 else 'grayscale'
     writer = SummaryWriter(log_dir=f'celebA/mcnn/epoch_wise/width_{layer_width}/{model_name}_{colour}')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -136,11 +136,12 @@ if __name__ == "__main__":
     model_names = ['160k', '100k']
     dimensions = [1, 3]
     classes = 1  # CelebA classes to predict
-    layer_width = 8
-    epochs = 10
-    size = 32
+    layer_widths = [2, 4, 6, 8, 16, 32, 64]
+    epochs = 100
+    size = 128
     # train_model(model_names[1], dimensions[0], classes, layer_width, epochs, size)
-    for i in range(len(model_names)):
-        for j in range(len(dimensions)):
-            train_model(model_names[i], dimensions[j], classes, layer_width, epochs)
-            print(f'Model: {model_names[i]} with {dimensions[j]} dimensions is completed')
+    for layer_width in layer_widths:
+        for i in range(len(model_names)):
+            for j in range(len(dimensions)):
+                train_model(model_names[i], dimensions[j], classes, layer_width, epochs, size)
+                print(f'Model: {model_names[i]} with {dimensions[j]} dimensions is completed')
