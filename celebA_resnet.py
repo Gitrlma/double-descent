@@ -4,6 +4,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torchvision
 from torchvision.transforms import transforms
 from tqdm import tqdm
+from torchmetrics.classification import BinaryAccuracy
 
 class PreActBlock(nn.Module):
     '''Pre-activation version of the BasicBlock.'''
@@ -100,6 +101,7 @@ def train_model(model_name, dimensions, classes, layer_width, epochs, size = 128
     model = PreActResNet(PreActBlock, [2, 2, 2, 2], num_classes = classes, init_channels = layer_width, in_dim = dimensions) #Adoperate paper resnet
     model.to(device)
     criterion = nn.BCEWithLogitsLoss() #nn.CrossEntropyLoss()
+    metric = BinaryAccuracy()
     learning_rate = 1e-3
     optimizer = optim.AdamW(model.parameters(),
                            lr=learning_rate)  # TODO optim.SGD(model, lr=learning_rate, momentum=0.9)
@@ -110,26 +112,31 @@ def train_model(model_name, dimensions, classes, layer_width, epochs, size = 128
         model.train()
         train_loss = 0
         train_epoch_steps = 0
+        train_acc = 0
         for images, labels in training_loader:
             optimizer.zero_grad()
             images = images.to(device)
             labels = labels.to(device)
             pred = model(images)
-            loss = criterion(pred.squeeze(), labels[:, 2].float())
+            loss = criterion(pred.squeeze(), labels[:, 2].float()) # label fetched is attractive
             loss.backward()
+            acc = metric(pred.squeeze(), labels[:, 2].float())
 
             train_loss += loss.item() # Forming the total epoch loss as sum of all iteration losses
+            train_acc += acc
             train_epoch_steps += 1
 
             optimizer.step()
 
         train_epoch_loss = train_loss / train_epoch_steps # Fetch the average train epoch loss
         writer.add_scalar("train_epoch_loss", train_epoch_loss, epoch) # Add loss to tensorboard
-
+        train_epoch_acc = train_acc / train_epoch_steps  # Fetch the average train epoch accuracy
+        writer.add_scalar("train_epoch_accuracy", train_epoch_acc, epoch)  # Add accuracy to tensorboard
 
         # Model evaluation
         total_loss = 0.0
         validation_epoch_steps = 0
+        test_acc = 0
         model.eval()
         for images, labels in validation_loader:
             images = images.to(device)
@@ -137,11 +144,15 @@ def train_model(model_name, dimensions, classes, layer_width, epochs, size = 128
             with torch.no_grad():
                 pred = model(images)
                 loss = criterion(pred.squeeze(), labels[:, 2].float())
+                acc = metric(pred.squeeze(), labels[:, 2].float())
                 total_loss += loss.item()
+                test_acc += acc
                 validation_epoch_steps += 1
 
         test_epoch_loss = total_loss / validation_epoch_steps  # Average test epoch loss
         writer.add_scalar("test_epoch_loss", test_epoch_loss, epoch)  # Add loss to tensorboard
+        test_epoch_acc = test_acc / validation_epoch_steps  # Fetch the average test epoch accuracy
+        writer.add_scalar("test_epoch_accuracy", test_epoch_acc, epoch)  # Add loss to tensorboard
         print(f'Epoch {epoch}  Training loss: {train_epoch_loss}  Test loss: {test_epoch_loss}')
 
 
@@ -152,7 +163,7 @@ if __name__ == "__main__":
     classes = 1 # CelebA classes to predict
     layer_widths = [2, 4, 6, 8, 16, 32, 64]
     epochs = 100
-    size = 128
+    size = 32
     #train_model(model_names[1], dimensions[0], classes, layer_width, epochs, size)
     for layer_width in layer_widths:
         for i in range(len(model_names)):
